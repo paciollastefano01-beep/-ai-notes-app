@@ -59,12 +59,14 @@ app.delete('/api/notes/:id', (req, res) => {
 });
 
 // === ROUTE AI con OLLAMA ===
+
+// RIASSUMI
 app.post('/api/ai/summarize', async (req, res) => {
     const { content } = req.body;
     try {
         const response = await ollama.chat({
-            model: 'llama3.1',
-            messages: [{ role: 'user', content: `Riassumi questo testo in italiano in massimo 3 frasi: ${content}` }],
+            model: 'tinyllama',
+            messages: [{ role: 'user', content: `Summarize in Italian in max 2 sentences: ${content}` }],
         });
         res.json({ summary: response.message.content });
     } catch (error) {
@@ -72,6 +74,32 @@ app.post('/api/ai/summarize', async (req, res) => {
     }
 });
 
+// TRADUCI MULTI-LINGUA
+// TRADUCI MULTI-LINGUA
+app.post('/api/ai/translate', async (req, res) => {
+    const { content, language } = req.body;
+    console.log('Richiesta traduzione:', content, 'in', language);
+    try {
+        const response = await ollama.chat({
+            model: 'llama3.1',  // ← Mantieni per traduzioni accurate
+            messages: [{
+                role: 'user',
+                content: `Translate to ${language}: ${content}`
+            }],
+            options: {
+                temperature: 0.3,  // ← Più deterministico = più veloce
+                num_predict: 100   // ← Max 100 token di risposta
+            }
+        });
+        console.log('Risposta Ollama:', response.message.content);
+        res.json({ translation: response.message.content });
+    } catch (error) {
+        console.log('Errore:', error.message);
+        res.status(500).json({ error: 'Errore traduzione: ' + error.message });
+    }
+});
+
+// CHIEDI
 app.post('/api/ai/ask', async (req, res) => {
     const { content, question } = req.body;
     try {
@@ -87,5 +115,8 @@ app.post('/api/ai/ask', async (req, res) => {
 
 // Avvia server
 app.listen(port, () => {
-    console.log(`✅ Server in esecuzione su http://localhost:${port}`);
+    console.log('=================================');
+    console.log('Server in esecuzione su http://localhost:3000');
+    console.log('Modello Ollama: llama3.1');
+    console.log('=================================');
 });

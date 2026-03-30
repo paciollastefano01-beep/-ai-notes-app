@@ -95,6 +95,25 @@
             border-left: 4px solid #533483;
         }
 
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+            color: #e94560;
+        }
+
         .ai-response strong {
             color: #533483;
         }
@@ -128,7 +147,63 @@
                     <div class="note-card" id="note-${note.id}">
                         <h3>${note.title}</h3>
                         <p>${note.content}</p>
-                        <button class="btn-ai" onclick="summarize(${note.id}, '${encodeURIComponent(note.content)}')">🤖 Riassumi con IA</button>
+                        <select id="lang-${note.id}" style="padding:8px; border-radius:8px; background:#0f3460; color:#eee; border:none; margin:5px;">
+                            <option value="inglese">🇬🇧 Inglese</option>
+                            <option value="francese">🇫🇷 Francese</option>
+                            <option value="spagnolo">🇪🇸 Spagnolo</option>
+                            <option value="tedesco">🇩🇪 Tedesco</option>
+                            <option value="portoghese">🇵🇹 Portoghese</option>
+                            <option value="giapponese">🇯🇵 Giapponese</option>
+                            <option value="cinese">🇨🇳 Cinese</option>
+                            <option value="arabo">🇸🇦 Arabo</option>
+                            <option value="russo">🇷🇺 Russo</option>
+                            <option value="olandese">🇳🇱 Olandese</option>
+                        </select>
+                        <button class="btn-ai" onclick="translateNote(${note.id}, '${encodeURIComponent(note.content)}')">🌍 Traduci</button>
+                        <button class="btn-ai" onclick="summarize(${note.id}, '${encodeURIComponent(note.content)}')">🤖 Riassumi</button>
+                        <button class="btn-delete" onclick="deleteNote(${note.id})">🗑️ Elimina</button>
+                        <div id="ai-${note.id}"></div>
+                    </div>
+                `;
+            });
+        }
+
+        async function searchNotes() {
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            const res = await fetch(`${API}/notes`);
+            const notes = await res.json();
+            const container = document.getElementById('notesList');
+            container.innerHTML = '';
+
+            const filtered = notes.filter(note =>
+                note.title.toLowerCase().includes(query) ||
+                note.content.toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#888;">😔 Nessuna nota trovata</p>';
+                return;
+            }
+
+            filtered.forEach(note => {
+                container.innerHTML += `
+                    <div class="note-card" id="note-${note.id}">
+                        <h3>${note.title}</h3>
+                        <p>${note.content}</p>
+                        <select id="lang-${note.id}" style="padding:8px; border-radius:8px; background:#0f3460; color:#eee; border:none; margin:5px;">
+                            <option value="inglese">🇬🇧 Inglese</option>
+                            <option value="francese">🇫🇷 Francese</option>
+                            <option value="spagnolo">🇪🇸 Spagnolo</option>
+                            <option value="tedesco">🇩🇪 Tedesco</option>
+                            <option value="portoghese">🇵🇹 Portoghese</option>
+                            <option value="giapponese">🇯🇵 Giapponese</option>
+                            <option value="cinese">🇨🇳 Cinese</option>
+                            <option value="arabo">🇸🇦 Arabo</option>
+                            <option value="russo">🇷🇺 Russo</option>
+                            <option value="olandese">🇳🇱 Olandese</option>
+                        </select>
+                        <button class="btn-ai" onclick="translateNote(${note.id}, '${encodeURIComponent(note.content)}')">🌍 Traduci</button>
+                        <button class="btn-ai" onclick="summarize(${note.id}, '${encodeURIComponent(note.content)}')">🤖 Riassumi</button>
                         <button class="btn-delete" onclick="deleteNote(${note.id})">🗑️ Elimina</button>
                         <div id="ai-${note.id}"></div>
                     </div>
@@ -170,6 +245,74 @@
                 </div>
             `;
         }
+
+        async function translateNote(id, encodedContent) {
+            const content = decodeURIComponent(encodedContent);
+            const langSelect = document.getElementById(`lang-${id}`);
+
+            if (!langSelect) {
+                document.getElementById(`ai-${id}`).innerHTML = `
+                    <div class="ai-response">
+                        <strong>❌ Errore:</strong>
+                        <p>Menu lingua non trovato!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const language = langSelect.value;
+            document.getElementById(`ai-${id}`).innerHTML = `<p class="loading">🌍 Traduzione in ${language}... (può richiedere 10-30 secondi)</p>`;
+
+            try {
+                const res = await fetch(`${API}/ai/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, language })
+                });
+
+                const text = await res.text();
+                console.log('Risposta server:', text);
+
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    document.getElementById(`ai-${id}`).innerHTML = `
+                        <div class="ai-response">
+                            <strong>❌ Risposta non valida:</strong>
+                            <p>${text}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (data.error) {
+                    document.getElementById(`ai-${id}`).innerHTML = `
+                        <div class="ai-response">
+                            <strong>❌ Errore server:</strong>
+                            <p>${data.error}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                document.getElementById(`ai-${id}`).innerHTML = `
+                    <div class="ai-response">
+                        <strong>🌍 Traduzione (${language}):</strong>
+                        <p>${data.translation}</p>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById(`ai-${id}`).innerHTML = `
+                    <div class="ai-response">
+                        <strong>❌ Errore connessione:</strong>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 👆👆👆 FINE CODICE DA AGGIUNGERE 👆👆👆
 
         async function deleteNote(id) {
             await fetch(`${API}/notes/${id}`, { method: 'DELETE' });
